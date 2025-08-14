@@ -32,12 +32,15 @@ EditSelection currentSelection = RETURN;
 
 unsigned long exposure_start_time = 0;
 unsigned long exposure_duration = 60000; // 60 seconds
-unsigned long dimmer_value = 6000; // 75 % power, 15 W
+uint16_t dimmer_value = 6000; // 75 % power, 15 W
 
 const unsigned long MAX_EXPOSURE_DURATION = 600000; // 10 minutes
 const unsigned long MIN_EXPOSURE_DURATION = 0; // 0 seconds
-const unsigned long MAX_DIMMER_VALUE = 8000; // 100 % power, 20 W
-const unsigned long MIN_DIMMER_VALUE = 0; // 0 % power, 0 W
+const uint16_t MAX_DIMMER_VALUE = 8000; // 100 % power
+const uint16_t MIN_DIMMER_VALUE = 0; // 0 % power
+
+const unsigned int MAX_POWER = 20; //Maximum power 20 W
+const unsigned int DIMMER_PER_WATT = MAX_DIMMER_VALUE / MAX_POWER;
 
 const unsigned long DEBOUNCE_DELAY = 50;
 const unsigned long DISPLAY_UPDATE_INTERVAL = 100;
@@ -45,6 +48,7 @@ const int ENCODER_STEP_DURATION = 250;
 const int ENCODER_STEP_POWER = 10;
 
 void update_display();
+void display_power_and_duration();
 
 void setup()
 {
@@ -65,7 +69,7 @@ void setup()
   noInterrupts();
   TCCR1A = 0 | (1 << COM1A1);
   TCCR1B = 0 | (1 << WGM13) | (1 << CS10);
-  ICR1 = 8000;
+  ICR1 = MAX_DIMMER_VALUE;
   OCR1A = 0;
   interrupts();
 }
@@ -197,13 +201,7 @@ void update_display()
       display.setTextSize(4);
       display.setCursor(16, 2);
       display.print("Idle");
-      display.setTextSize(1);
-      display.setCursor(12, 42);
-      snprintf(buf, sizeof(buf), "Power:    %2lu.%lu W", dimmer_value / 400, (dimmer_value % 400) / 40);
-      display.print(buf);
-      display.setCursor(12, 54);
-      snprintf(buf, sizeof(buf), "Exposure: %3lu s", exposure_duration / 1000);
-      display.print(buf);
+      display_power_and_duration();
       break;
 
     case EXPOSURE:
@@ -219,13 +217,7 @@ void update_display()
       display.setTextSize(4);
       display.setCursor(16, 2);
       display.print("Edit");
-      display.setTextSize(1);
-      display.setCursor(12, 42);
-      snprintf(buf, sizeof(buf), "Power:    %2lu.%lu W", dimmer_value / 400, (dimmer_value % 400) / 40);
-      display.print(buf);
-      display.setCursor(12, 54);
-      snprintf(buf, sizeof(buf), "Exposure: %3lu s", exposure_duration / 1000);
-      display.print(buf);
+      display_power_and_duration();
 
       switch(currentSelection)
       {
@@ -254,12 +246,7 @@ void update_display()
       display.setTextSize(1);
       display.setCursor(3, 54);
       display.write(0xAF);
-      display.setCursor(12, 42);
-      snprintf(buf, sizeof(buf), "Power:    %2lu.%lu W", dimmer_value / 400, (dimmer_value % 400) / 40);
-      display.print(buf);
-      display.setCursor(12, 54);
-      snprintf(buf, sizeof(buf), "Exposure: %3lu s", exposure_duration / 1000);
-      display.print(buf);
+      display_power_and_duration();
       break;
 
     case EDIT_POWER:
@@ -269,13 +256,24 @@ void update_display()
       display.setTextSize(1);
       display.setCursor(3, 42);
       display.write(0xAF);
-      display.setCursor(12, 42);
-      snprintf(buf, sizeof(buf), "Power:    %2lu.%lu W", dimmer_value / 400, (dimmer_value % 400) / 40);
-      display.print(buf);
-      display.setCursor(12, 54);
-      snprintf(buf, sizeof(buf), "Exposure: %3lu s", exposure_duration / 1000);
-      display.print(buf);
+      display_power_and_duration();
       break;
   } 
   display.display();
+}
+
+
+void display_power_and_duration()
+{
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  char buffer[32];
+  // Calculate the decimal part of the power (tenths of a watt)
+  unsigned int power_whole = dimmer_value / DIMMER_PER_WATT;
+  unsigned int power_decimal = (dimmer_value % DIMMER_PER_WATT) * 10 / DIMMER_PER_WATT;
+  snprintf(buffer, sizeof(buffer), "Power:    %2u.%u W", power_whole, power_decimal);
+  display.print(buffer);
+  display.setCursor(0, 10);
+  snprintf(buffer, sizeof(buffer), "Exposure: %3lu s", exposure_duration / 1000);
+  display.print(buffer);
 }
